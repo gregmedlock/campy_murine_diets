@@ -142,9 +142,15 @@ saveRDS(diet_tukey_posthoc_evenness, "~/Documents/projects/campy_murine_diets/re
 
 copy_sample_data = sample_data(ps_for_alpha)
 richness$plate_sample = rownames(richness)
+evenness$plate_sample = rownames(evenness)
+
 copy_sample_data = merge(copy_sample_data,richness,by='plate_sample')
 
 # plot richness vs. campy for all samples
+copy_sample_data
+
+# plot evenness vs. campy for all samples
+
 
 
 ###------------------------------------------------------------------------
