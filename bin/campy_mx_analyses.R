@@ -49,6 +49,9 @@ sample_data(ps) = new_sampledata
 ps = prune_samples(sample_data(ps)$diet %in% c("HC","dPD","dZD"),ps)
 # remove samples that have 0 reads
 ps = prune_samples(sample_sums(ps) > 0, ps)
+# get rid of day 11
+ps = prune_samples(sample_data(ps)$days_post_infection %in% c(0,1,5,9),ps)
+
 
 ###--------------------------------------------------------------------------
 
@@ -144,16 +147,51 @@ copy_sample_data = sample_data(ps_for_alpha)
 richness$plate_sample = rownames(richness)
 evenness$plate_sample = rownames(evenness)
 
-copy_sample_data = merge(copy_sample_data,richness,by='plate_sample')
+copy_sample_data = merge(data.frame(copy_sample_data),richness,by='plate_sample')
+copy_sample_data = merge(copy_sample_data,evenness,by='plate_sample')
 
+# generate expression to italicize campy in labels
+xlabel_expression = expression(paste(italic("C. jejuni"),"/10mg stool"))
 # plot richness vs. campy for all samples
-copy_sample_data
+# plot evenness vs. campy for all samples
+p = ggplot(copy_sample_data[copy_sample_data$infected==TRUE,], aes(y=log(Observed),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
+p = p + theme(strip.text.x=element_text(size=20,face="bold"),
+              axis.title.x = element_text(size=20), 
+              axis.text.x = element_text(size=12, angle=45,hjust=1),
+              axis.title.y = element_text(size=20)) + labs(x=xlabel_expression)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_Observed.svg", plot=p, width=8, height=4)
 
 # plot evenness vs. campy for all samples
-
-
+p = ggplot(copy_sample_data[copy_sample_data$infected==TRUE,], aes(y=log(InvSimpson),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
+p = p + theme(strip.text.x=element_text(size=20,face="bold"),
+              axis.title.x = element_text(size=20), 
+              axis.text.x = element_text(size=12, angle=45,hjust=1),
+              axis.title.y = element_text(size=20)) + labs(x=xlabel_expression)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_InvSimpson.svg", plot=p, width=8, height=4)
 
 ###------------------------------------------------------------------------
+
+### NMDS of beta diversity using rarefied data
+ps_rare
+for_factor_conversion = sample_data(ps_rare)
+for_factor_conversion$days_post_infection = as.factor(for_factor_conversion$days_post_infection)
+sample_data(ps_rare) = for_factor_conversion
+ps_rare.ord = ordinate(ps_rare,  method="NMDS", distance = "bray")
+
+p = plot_ordination(
+  physeq = ps_rare,
+  ordination = ps_rare.ord,
+  color = "days_post_infection",
+  shape = "infected"
+) + facet_wrap(~diet) + geom_point(size=6,alpha = 0.5) + 
+  theme(strip.text.x=element_text(size=20,face="bold"))
+###
+ggsave(file="~/Documents/projects/campy_murine_diets/results/nmds_all.svg", plot=p, width=12, height=4)
+
+
+
+
+
 
 ### FIGURE 2: NMDS of beta diversity for all samples-----------------------
 days_to_plot = c(0,1,5,9)
