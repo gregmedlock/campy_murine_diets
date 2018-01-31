@@ -118,26 +118,41 @@ diet_tukey_posthoc_richness = TukeyHSD(diet_anova)
 
 # plot evenness and save associated test object
 theme_set(theme_bw())
-p = plot_richness(ps_for_alpha,measures = "Observed", x='days_post_infection')
-p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet)
+infection_labeller = list("FALSE"="Uninfected","TRUE"="Infected")
+# change infected label from True/False to infected/uninfected
+tempsampledata = sample_data(ps_for_alpha)
+col2=ifelse(tempsampledata$infected==TRUE,"Infected","Uninfected")
+tempsampledata$infected = col2
+sample_data(ps_for_alpha) = tempsampledata
+p = plot_richness(ps_for_alpha,measures = "Observed", x='days_post_infection',color='days_post_infection')
+p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
+  theme(strip.text.x=element_text(size=20,face="bold"),
+        strip.text.y=element_text(size=20,face="bold"),
+        axis.title.x = element_text(size=20), 
+        axis.text.x = element_text(size=12,angle=0,hjust=0.5),
+        axis.title.y = element_text(size=20)) + labs(y="Richness (observed ASVs)",x="days post-infection")
 #p$layers = p$layers[-1]
 p
 # save as svg
-ggsave(file="~/Documents/projects/campy_murine_diets/results/Observed_div_all.svg", plot=p, width=10, height=8)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/Observed_div_all.svg", plot=p, width=10, height=6)
 # save the anova results
 saveRDS(diet_tukey_posthoc_evenness, "~/Documents/projects/campy_murine_diets/results/Observed_anova_posthoc.rds")
 
 # plot richness and save associated test object
 theme_set(theme_bw())
-p = plot_richness(ps_for_alpha,measures = "InvSimpson", x='days_post_infection')
-p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet)
+p = plot_richness(ps_for_alpha,measures = "InvSimpson", x='days_post_infection', color='days_post_infection')
+p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
+  theme(strip.text.x=element_text(size=20,face="bold"),
+        strip.text.y=element_text(size=20,face="bold"),
+        axis.title.x = element_text(size=20), 
+        axis.text.x = element_text(size=12,angle=0,hjust=0.5),
+        axis.title.y = element_text(size=20)) + labs(y="Evenness (Inverse Simpson)",x="days post-infection")
 #p$layers = p$layers[-1]
 p
 # save as svg
-ggsave(file="~/Documents/projects/campy_murine_diets/results/InvSimpson_div_all.svg", plot=p, width=10, height=8)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/InvSimpson_div_all.svg", plot=p, width=10, height=6)
 # save the anova results
 saveRDS(diet_tukey_posthoc_evenness, "~/Documents/projects/campy_murine_diets/results/InvSimpson_anova_posthoc.rds")
-
 
 ###------------------------------------------------------------------------
 
@@ -154,7 +169,7 @@ copy_sample_data = merge(copy_sample_data,evenness,by='plate_sample')
 xlabel_expression = expression(paste(italic("C. jejuni"),"/10mg stool"))
 # plot richness vs. campy for all samples
 # plot evenness vs. campy for all samples
-p = ggplot(copy_sample_data[copy_sample_data$infected==TRUE,], aes(y=log(Observed),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
+p = ggplot(copy_sample_data[copy_sample_data$infected=="Infected",], aes(y=log(Observed),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
 p = p + theme(strip.text.x=element_text(size=20,face="bold"),
               axis.title.x = element_text(size=20), 
               axis.text.x = element_text(size=12, angle=45,hjust=1),
@@ -162,7 +177,7 @@ p = p + theme(strip.text.x=element_text(size=20,face="bold"),
 ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_Observed.svg", plot=p, width=8, height=4)
 
 # plot evenness vs. campy for all samples
-p = ggplot(copy_sample_data[copy_sample_data$infected==TRUE,], aes(y=log(InvSimpson),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
+p = ggplot(copy_sample_data[copy_sample_data$infected=="Infected",], aes(y=log(InvSimpson),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
 p = p + theme(strip.text.x=element_text(size=20,face="bold"),
               axis.title.x = element_text(size=20), 
               axis.text.x = element_text(size=12, angle=45,hjust=1),
@@ -189,80 +204,22 @@ p = plot_ordination(
 ggsave(file="~/Documents/projects/campy_murine_diets/results/nmds_all.svg", plot=p, width=12, height=4)
 
 
-
-
-
-
-### FIGURE 2: NMDS of beta diversity for all samples-----------------------
-days_to_plot = c(0,1,5,9)
-ps_for_beta = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% days_to_plot,ps_trimmed)
-sample_data(ps_for_beta)$days_post_infection = as.factor(sample_data(ps_for_beta)$days_post_infection)
-
-ps_trimmed.ord <- ordinate(ps_for_beta, "NMDS", "bray")
-theme_set(theme_bw())
-p1 = plot_ordination(ps_for_beta, ps_trimmed.ord, color="days_post_infection",type="samples", shape="infected") + facet_wrap(~diet) + theme(strip.text = element_text(size=20)) 
-p1 = p1 + geom_point(size=5,alpha=0.5)
-#new_data = newdata=data.frame(ps_d015.ord$points[,1],ps_d015.ord$points[,2],sample_data(ps_d015)$infected)
-#colnames(new_data) = c('NMDS1','NMDS2','infected')
-#p1 = p1 + geom_point(data=new_data,mapping=aes(shape='infected'))
-p1
-ggsave(file="~/Documents/projects/campy_murine_diets/results/beta_div_bray_all.svg", plot=p1, width=15, height=4.5)
-###------------------------------------------------------------------------
-
-### NMDS within each diet--------------------------------------------------
-days_to_plot = c(0,1,5,9)
-ps_for_beta = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% days_to_plot,ps_trimmed)
-sample_data(ps_for_beta)$days_post_infection = as.factor(sample_data(ps_for_beta)$days_post_infection)
-
-# subset by diet
-ps_for_beta_dPD = prune_samples(sample_data(ps_for_beta)$diet == "dPD",ps_for_beta)
-ps_for_beta_dZD = prune_samples(sample_data(ps_for_beta)$diet == "dZD",ps_for_beta)
-ps_for_beta_HC = prune_samples(sample_data(ps_for_beta)$diet == "HC",ps_for_beta)
-
-ps_trimmed_dPD.ord <- ordinate(ps_for_beta_dPD, "NMDS", "bray")
-ps_trimmed_dZD.ord <- ordinate(ps_for_beta_dZD, "NMDS", "bray")
-ps_trimmed_HC.ord <- ordinate(ps_for_beta_HC, "NMDS", "bray")
-
-# perform adonis test within each diet to 
-phyloseq::distance(erie_scale, method = "bray")
-adonis(ps_trimmed_dPD.ord,)
-
-theme_set(theme_bw())
-p1 = plot_ordination(ps_for_beta_dPD, ps_trimmed_dPD.ord, color="days_post_infection",type="samples", shape="infected") + theme(strip.text = element_text(size=20)) 
-p1 = p1 + geom_point(size=5,alpha=0.5)
-#new_data = newdata=data.frame(ps_d015.ord$points[,1],ps_d015.ord$points[,2],sample_data(ps_d015)$infected)
-#colnames(new_data) = c('NMDS1','NMDS2','infected')
-#p1 = p1 + geom_point(data=new_data,mapping=aes(shape='infected'))
-p1
-ggsave(file="~/Documents/projects/campy_murine_diets/results/beta_div_bray_dPD.svg", plot=p1, width=5, height=3)
-
-
-p1 = plot_ordination(ps_for_beta_dZD, ps_trimmed_dZD.ord, color="days_post_infection",type="samples", shape="infected") + theme(strip.text = element_text(size=20)) 
-p1 = p1 + geom_point(size=5,alpha=0.5)
-#new_data = newdata=data.frame(ps_d015.ord$points[,1],ps_d015.ord$points[,2],sample_data(ps_d015)$infected)
-#colnames(new_data) = c('NMDS1','NMDS2','infected')
-#p1 = p1 + geom_point(data=new_data,mapping=aes(shape='infected'))
-p1
-ggsave(file="~/Documents/projects/campy_murine_diets/results/beta_div_bray_dZD.svg", plot=p1, width=5, height=3)
-
-
-p1 = plot_ordination(ps_for_beta_HC, ps_trimmed_HC.ord, color="days_post_infection",type="samples", shape="infected") + theme(strip.text = element_text(size=20)) 
-p1 = p1 + geom_point(size=5,alpha=0.5)
-#new_data = newdata=data.frame(ps_d015.ord$points[,1],ps_d015.ord$points[,2],sample_data(ps_d015)$infected)
-#colnames(new_data) = c('NMDS1','NMDS2','infected')
-#p1 = p1 + geom_point(data=new_data,mapping=aes(shape='infected'))
-p1
-ggsave(file="~/Documents/projects/campy_murine_diets/results/beta_div_bray_HC.svg", plot=p1, width=5, height=3)
-
-###------------------------------------------------------------------------
-
-
 ### DIFFERENTIAL ABUNDANCE-------------------------------------------------
+
+# We will use filtered data with low-abundance, rare ASVs removed for differential abundance
+rare_min = 5000
+# remove samples with fewer counts than the minimum
+ps_rare_diff = prune_samples(sample_sums(ps_trimmed) >=rare_min,ps_trimmed)
+ps_rare_diff = rarefy_even_depth(ps_rare_diff,sample.size=5000,rngseed=SEED_INT) # OTUs no longer in the dataset will be removed
+
+
 library("DESeq2")
 alpha = 0.05
 
+
+
 ### Compare each diet at d0 first, since microbiota might be implicated in susceptibility
-ps_d0 = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% c(0),ps_trimmed)
+ps_d0 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(0),ps_rare_diff)
 # trim again to remove low-abundance taxa within this subset. Loosen the # samples restriction
 # since this is a smaller sample size
 ps_d0_taxatrim = filter_taxa(ps_d0, function(x) sum(x > 1) > 3, TRUE)
@@ -301,13 +258,13 @@ lower_in_dZD = merge(lower_in_dZD,d0_dZDvHC[d0_dZDvHC$log2FoldChange < 0,][c("Ro
 
 ### Now compare infected vs. uninfected at each time point for each diet
 # Effect of infection at each time point, for each diet
-ps_d1 = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% c(1),ps_trimmed)
+ps_d1 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(1),ps_rare_diff)
 ps_d1_taxatrim = filter_taxa(ps_d1, function(x) sum(x > 1) > 3, TRUE)
 ps_d1_taxatrim = filter_taxa(ps_d1_taxatrim, function(x) max(x) > 10, TRUE)
-ps_d5 = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% c(5),ps_trimmed)
+ps_d5 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(5),ps_rare_diff)
 ps_d5_taxatrim = filter_taxa(ps_d5, function(x) sum(x > 1) > 3, TRUE)
 ps_d5_taxatrim = filter_taxa(ps_d5_taxatrim, function(x) max(x) > 10, TRUE)
-ps_d9 = prune_samples(sample_data(ps_trimmed)$days_post_infection %in% c(9),ps_trimmed)
+ps_d9 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(9),ps_rare_diff)
 ps_d9_taxatrim = filter_taxa(ps_d9, function(x) sum(x > 1) > 3, TRUE)
 ps_d9_taxatrim = filter_taxa(ps_d9_taxatrim, function(x) max(x) > 10, TRUE)
 
@@ -342,8 +299,7 @@ d5_HC = infection_comparison(x="HC",ps_obj=ps_d5_taxatrim,path="~/Documents/proj
 d9_HC = infection_comparison(x="HC",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_HC_infection_diff.txt",alpha=0.05)
 
 # at each time point, determine the shared differentially abundant sequences for each diet
-# day 1, up in all diets all diets
-d1_dN[d1_dN$log2FoldChange > 0,]
+
 
 ###------------------------------------------------------------------------
 
