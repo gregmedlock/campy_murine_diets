@@ -4,6 +4,7 @@ library(ggplot2)
 library(phyloseq)
 library(reshape2)
 library(vegan)
+library(gridExtra)
 SEED_INT = 10
 set.seed(SEED_INT) # set the seed number for reproducibility in randomly generated numbers
 
@@ -12,6 +13,11 @@ set.seed(SEED_INT) # set the seed number for reproducibility in randomly generat
 ps <- readRDS("~/Documents/projects/campy_murine_diets/data/campy_phyloseq_obj_less_strict.rds")
 # remove neg control
 neg_control = prune_samples(rownames(sample_data(ps)) %in% c("Plate3-D03"),ps)
+# save a bar plot of the neg control (mock) for quality assurance supplementary figure
+p = plot_bar(neg_control, "Order", fill="Order")
+p
+ggsave(file="~/Documents/projects/campy_murine_diets/results/mock_abundances.svg",p,height=10,width=15)
+
 path = "~/Documents/projects/campy_murine_diets/data/"
 metadata = read.table(paste0(path,"Campy3microbiome1-23-2017.txt"),header=TRUE,
                       sep = "\t")
@@ -44,6 +50,16 @@ new_sampledata$Row.names = NULL
 ps = prune_samples(rownames(sample_data(ps)) %in% rownames(new_sampledata), ps)
 #sample_data(ps) = new_sampledata
 sample_data(ps) = new_sampledata
+
+# remove mitochondrial and chloroplast reads
+og_taxa = data.frame(tax_table(ps))
+# first remove non-bacteria
+keep = rownames(og_taxa[og_taxa$Kingdom == "Bacteria",])
+ps = prune_taxa(keep,ps)
+keep = rownames(og_taxa[og_taxa$Family != "Mitochondria",])
+ps = prune_taxa(keep,ps)
+keep = rownames(og_taxa[og_taxa$Class != "Chloroplast",])
+ps = prune_taxa(keep,ps)
 
 # For this study, remove dN samples
 ps = prune_samples(sample_data(ps)$diet %in% c("HC","dPD","dZD"),ps)
@@ -116,6 +132,13 @@ asdf$infected = as.factor(asdf$infected)
 diet_anova = aov(Observed~diet*days_post_infection*infected,data=asdf)
 diet_tukey_posthoc_richness = TukeyHSD(diet_anova)
 
+# define variables for ggplot sizes to make them consistent across figures
+legend_textsize=20
+legend_symbolsize=1
+size_striptext = 20
+size_title = 20
+size_axistext = 12
+
 # plot evenness and save associated test object
 theme_set(theme_bw())
 infection_labeller = list("FALSE"="Uninfected","TRUE"="Infected")
@@ -125,32 +148,42 @@ col2=ifelse(tempsampledata$infected==TRUE,"Infected","Uninfected")
 tempsampledata$infected = col2
 sample_data(ps_for_alpha) = tempsampledata
 p = plot_richness(ps_for_alpha,measures = "Observed", x='days_post_infection',color='days_post_infection')
-p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
-  theme(strip.text.x=element_text(size=20,face="bold"),
-        strip.text.y=element_text(size=20,face="bold"),
-        axis.title.x = element_text(size=20), 
-        axis.text.x = element_text(size=12,angle=0,hjust=0.5),
-        axis.title.y = element_text(size=20)) + labs(y="Richness (observed ASVs)",x="days post-infection")
+p1 = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
+  theme(strip.text.x=element_text(size=size_striptext,face="bold"),
+        strip.text.y=element_text(size=size_striptext,face="bold"),
+        axis.title.x = element_text(size=size_title), 
+        axis.text.x = element_text(size=size_axistext,angle=0,hjust=0.5),
+        axis.text.y = element_text(size=size_axistext),
+        axis.title.y = element_text(size=size_title),
+        legend.position="none",
+        plot.margin = unit(c(1,1,1,1), "cm")) + 
+        labs(y="Richness (observed ASVs)",x="days post-infection")
+        
 #p$layers = p$layers[-1]
-p
+p1
 # save as svg
-ggsave(file="~/Documents/projects/campy_murine_diets/results/Observed_div_all.svg", plot=p, width=10, height=6)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/Observed_div_all.svg", plot=p1, width=10, height=6)
 # save the anova results
-saveRDS(diet_tukey_posthoc_evenness, "~/Documents/projects/campy_murine_diets/results/Observed_anova_posthoc.rds")
+saveRDS(diet_tukey_posthoc_richness, "~/Documents/projects/campy_murine_diets/results/Observed_anova_posthoc.rds")
 
 # plot richness and save associated test object
 theme_set(theme_bw())
 p = plot_richness(ps_for_alpha,measures = "InvSimpson", x='days_post_infection', color='days_post_infection')
-p = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
-  theme(strip.text.x=element_text(size=20,face="bold"),
-        strip.text.y=element_text(size=20,face="bold"),
-        axis.title.x = element_text(size=20), 
-        axis.text.x = element_text(size=12,angle=0,hjust=0.5),
-        axis.title.y = element_text(size=20)) + labs(y="Evenness (Inverse Simpson)",x="days post-infection")
+p2 = p + geom_boxplot(alpha=0.5) + facet_grid(infected~diet) +
+  theme(strip.text.x=element_text(size=size_striptext,face="bold"),
+        strip.text.y=element_text(size=size_striptext,face="bold"),
+        axis.title.x = element_text(size=size_title), 
+        axis.text.x = element_text(size=size_axistext,angle=0,hjust=0.5),
+        axis.text.y = element_text(size=size_axistext),
+        axis.title.y = element_text(size=size_title),
+        legend.position="none",
+        plot.margin = unit(c(1,1,1,1), "cm")) + 
+        labs(y="Evenness (Inverse Simpson)",x="days post-infection") +
+        guides(colour = guide_legend(override.aes = list(size=legend_symbolsize)))
 #p$layers = p$layers[-1]
-p
+p2
 # save as svg
-ggsave(file="~/Documents/projects/campy_murine_diets/results/InvSimpson_div_all.svg", plot=p, width=10, height=6)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/InvSimpson_div_all.svg", plot=p2, width=10, height=6)
 # save the anova results
 saveRDS(diet_tukey_posthoc_evenness, "~/Documents/projects/campy_murine_diets/results/InvSimpson_anova_posthoc.rds")
 
@@ -170,19 +203,26 @@ xlabel_expression = expression(paste(italic("C. jejuni"),"/10mg stool"))
 # plot richness vs. campy for all samples
 # plot evenness vs. campy for all samples
 p = ggplot(copy_sample_data[copy_sample_data$infected=="Infected",], aes(y=log(Observed),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
-p = p + theme(strip.text.x=element_text(size=20,face="bold"),
-              axis.title.x = element_text(size=20), 
-              axis.text.x = element_text(size=12, angle=45,hjust=1),
-              axis.title.y = element_text(size=20)) + labs(x=xlabel_expression)
-ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_Observed.svg", plot=p, width=8, height=4)
+p3 = p + theme(strip.text.x=element_text(size=size_striptext,face="bold"),
+              axis.title.x = element_text(size=size_title), 
+              axis.text.x = element_text(size=size_axistext, angle=45,hjust=1),
+              axis.text.y = element_text(size=size_axistext),
+              axis.title.y = element_text(size=size_title),
+              legend.position="none",
+              plot.margin = unit(c(1,1,1,1), "cm")) + labs(x=xlabel_expression)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_Observed.svg", plot=p3, width=8, height=4)
 
 # plot evenness vs. campy for all samples
 p = ggplot(copy_sample_data[copy_sample_data$infected=="Infected",], aes(y=log(InvSimpson),x=campy, color=days_post_infection)) + facet_wrap(~diet) +geom_point(size=4,alpha=0.5)
-p = p + theme(strip.text.x=element_text(size=20,face="bold"),
-              axis.title.x = element_text(size=20), 
-              axis.text.x = element_text(size=12, angle=45,hjust=1),
-              axis.title.y = element_text(size=20)) + labs(x=xlabel_expression)
-ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_InvSimpson.svg", plot=p, width=8, height=4)
+p4 = p + theme(strip.text.x=element_text(size=size_striptext,face="bold"),
+              axis.title.x = element_text(size=size_title), 
+              axis.text.x = element_text(size=size_axistext, angle=45,hjust=1),
+              axis.text.y = element_text(size=size_axistext),
+              axis.title.y = element_text(size=size_title),
+              legend.position="none",
+              plot.margin = unit(c(1,1,1,1), "cm")) + labs(x=xlabel_expression) +
+              scale_fill_discrete(guide=FALSE)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/campy_v_InvSimpson.svg", plot=p4, width=8, height=4)
 
 ###------------------------------------------------------------------------
 
@@ -193,16 +233,28 @@ for_factor_conversion$days_post_infection = as.factor(for_factor_conversion$days
 sample_data(ps_rare) = for_factor_conversion
 ps_rare.ord = ordinate(ps_rare,  method="NMDS", distance = "bray")
 
-p = plot_ordination(
+p5 = plot_ordination(
   physeq = ps_rare,
   ordination = ps_rare.ord,
   color = "days_post_infection",
   shape = "infected"
 ) + facet_wrap(~diet) + geom_point(size=6,alpha = 0.5) + 
-  theme(strip.text.x=element_text(size=20,face="bold"))
+  theme(strip.text.x=element_text(size=size_striptext,face="bold"),
+        axis.title.x = element_text(size=size_title), 
+        axis.text.x = element_text(size=size_axistext, angle=45,hjust=1),
+        axis.text.y = element_text(size=size_axistext),
+        axis.title.y = element_text(size=size_title),
+        legend.position="none",
+        plot.margin = unit(c(1,1,1,1), "cm"))
 ###
-ggsave(file="~/Documents/projects/campy_murine_diets/results/nmds_all.svg", plot=p, width=12, height=4)
+ggsave(file="~/Documents/projects/campy_murine_diets/results/nmds_all.svg", plot=p5, width=12, height=4)
 
+
+### Save multipanel plot for Figure 1
+pgrid = grid.arrange(p1,p2,p5,nrow=2,
+                     layout_matrix=rbind(c(1,2),c(3,3)),
+                     heights=c(1.2,1.5))
+ggsave(file="~/Documents/projects/campy_murine_diets/results/fig1_multipanel.svg",plot=pgrid,width=16, height=11)
 
 ### DIFFERENTIAL ABUNDANCE-------------------------------------------------
 
@@ -258,6 +310,9 @@ lower_in_dZD = merge(lower_in_dZD,d0_dZDvHC[d0_dZDvHC$log2FoldChange < 0,][c("Ro
 
 ### Now compare infected vs. uninfected at each time point for each diet
 # Effect of infection at each time point, for each diet
+ps_d0 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(0),ps_rare_diff)
+ps_d0_taxatrim = filter_taxa(ps_d0, function(x) sum(x > 1) > 3, TRUE)
+ps_d0_taxatrim = filter_taxa(ps_d0_taxatrim, function(x) max(x) > 10, TRUE)
 ps_d1 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(1),ps_rare_diff)
 ps_d1_taxatrim = filter_taxa(ps_d1, function(x) sum(x > 1) > 3, TRUE)
 ps_d1_taxatrim = filter_taxa(ps_d1_taxatrim, function(x) max(x) > 10, TRUE)
@@ -268,41 +323,128 @@ ps_d9 = prune_samples(sample_data(ps_rare_diff)$days_post_infection %in% c(9),ps
 ps_d9_taxatrim = filter_taxa(ps_d9, function(x) sum(x > 1) > 3, TRUE)
 ps_d9_taxatrim = filter_taxa(ps_d9_taxatrim, function(x) max(x) > 10, TRUE)
 
-infection_comparison = function(x,ps_obj,path,alpha) {
-  comp = prune_samples(sample_data(ps_obj)$diet %in% c(x),ps_obj)
-  comp = filter_taxa(comp, function(x) sum(x > 1) > 3, TRUE)
-  
-  comp_deseq = phyloseq_to_deseq2(comp, ~ infected)
-  print(comp_deseq)
-  comp_deseq = DESeq(comp_deseq, test="Wald", fitType="parametric")
-  comp_deseq = results(comp_deseq)
-  print(sum(is.na(comp_deseq)))
-  comp_deseq = merge(comp_deseq,tax_table(comp)[rownames(comp_deseq),],by="row.names")
-  print(sum(is.na(comp_deseq)))
-  comp_deseq = comp_deseq[comp_deseq$padj < alpha,]
+#infection_comparison = function(x,ps_obj,path,alpha) {
+#  comp = prune_samples(sample_data(ps_obj)$diet %in% c(x),ps_obj)
+#  comp = filter_taxa(comp, function(x) sum(x > 1) > 3, TRUE)
+#  
+#  comp_deseq = phyloseq_to_deseq2(comp, ~ infected)
+#  print(comp_deseq)
+#  comp_deseq = DESeq(comp_deseq, test="Wald", fitType="parametric")
+#  comp_deseq = results(comp_deseq)
+#  print(sum(is.na(comp_deseq)))
+#  comp_deseq = merge(comp_deseq,tax_table(comp)[rownames(comp_deseq),],by="row.names")
+#  print(sum(is.na(comp_deseq)))
+#  # replace NA p values with 1
+#  comp_deseq$padj[is.na(comp_deseq$padj)] = 1.0
+#  comp_deseq = comp_deseq[comp_deseq$padj < alpha,]
   # save
-  write.table(comp_deseq, file = path, sep = "\t", quote = FALSE,row.names = FALSE)
-  return(comp_deseq)
-}
+ # write.table(comp_deseq, file = path, sep = "\t", quote = FALSE,row.names = FALSE)
+#  return(comp_deseq)
+#}
 # run the comparison for all time points and save the results.
 #d1_dN = infection_comparison(x="dN",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_dN_infection_diff.txt",alpha=0.05)
 #d5_dN = infection_comparison(x="dN",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_dN_infection_diff.txt",alpha=0.05)
 #d9_dN = infection_comparison(x="dN",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_dN_infection_diff.txt",alpha=0.05)
-d1_dPD = infection_comparison(x="dPD",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_dPD_infection_diff.txt",alpha=0.05)
-d5_dPD = infection_comparison(x="dPD",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_dPD_infection_diff.txt",alpha=0.05)
-d9_dPD = infection_comparison(x="dPD",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_dPD_infection_diff.txt",alpha=0.05)
-d1_dZD = infection_comparison(x="dZD",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_dZD_infection_diff.txt",alpha=0.05)
-d5_dZD = infection_comparison(x="dZD",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_dZD_infection_diff.txt",alpha=0.05)
-d9_dZD = infection_comparison(x="dZD",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_dZD_infection_diff.txt",alpha=0.05)
-d1_HC = infection_comparison(x="HC",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_HC_infection_diff.txt",alpha=0.05)
-d5_HC = infection_comparison(x="HC",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_HC_infection_diff.txt",alpha=0.05)
-d9_HC = infection_comparison(x="HC",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_HC_infection_diff.txt",alpha=0.05)
+#d0_dPD = infection_comparison(x="dPD",ps_obj=ps_d0_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d0_dPD_infection_diff.txt",alpha=0.05)
+#d1_dPD = infection_comparison(x="dPD",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_dPD_infection_diff.txt",alpha=0.05)
+#d5_dPD = infection_comparison(x="dPD",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_dPD_infection_diff.txt",alpha=0.05)
+#d9_dPD = infection_comparison(x="dPD",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_dPD_infection_diff.txt",alpha=0.05)
+#d0_dZD = infection_comparison(x="dZD",ps_obj=ps_d0_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d0_dZD_infection_diff.txt",alpha=0.05)
+#d1_dZD = infection_comparison(x="dZD",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_dZD_infection_diff.txt",alpha=0.05)
+#d5_dZD = infection_comparison(x="dZD",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_dZD_infection_diff.txt",alpha=0.05)
+#d9_dZD = infection_comparison(x="dZD",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_dZD_infection_diff.txt",alpha=0.05)
+#d0_HC = infection_comparison(x="HC",ps_obj=ps_d0_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d0_HC_infection_diff.txt",alpha=0.05)
+#d1_HC = infection_comparison(x="HC",ps_obj=ps_d1_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d1_HC_infection_diff.txt",alpha=0.05)
+#d5_HC = infection_comparison(x="HC",ps_obj=ps_d5_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d5_HC_infection_diff.txt",alpha=0.05)
+#d9_HC = infection_comparison(x="HC",ps_obj=ps_d9_taxatrim,path="~/Documents/projects/campy_murine_diets/results/d9_HC_infection_diff.txt",alpha=0.05)
 
-# at each time point, determine the shared differentially abundant sequences for each diet
+# try with a single DESeq2 run
+ps_rare_diff_all = ps_rare_diff
+sample_data(ps_rare_diff_all)$days_post_infection = as.factor(sample_data(ps_rare_diff_all)$days_post_infection)
+sample_data(ps_rare_diff_all)$deseq_group = factor(paste0(sample_data(ps_rare_diff_all)$infected, sample_data(ps_rare_diff_all)$diet,sample_data(ps_rare_diff_all)$days_post_infection))
+comp_deseq = phyloseq_to_deseq2(ps_rare_diff_all, ~deseq_group)
+comp_deseq = DESeq(comp_deseq, test="Wald", fitType="parametric")
+resultsNames(comp_deseq)
+#define a function to extract the deseq results
+extract_deseq_results = function (comp_deseq,phyloseq_obj,comparisons,alpha) {
+  comparison_results = results(comp_deseq,comparisons)
+  comparison_frame = merge(comparison_results,tax_table(phyloseq_obj)[rownames(comparison_results),],by="row.names")
+  # replace NA p values with 1
+  comparison_frame$padj[is.na(comparison_frame$padj)] = 1.0
+  comparison_frame = comparison_frame[comparison_frame$padj < alpha,]
+}
+dZD_0dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdZD0","TRUEdZD0"),0.05)
+dZD_1dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdZD1","TRUEdZD1"),0.05)
+dZD_5dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdZD5","TRUEdZD5"),0.05)
+dZD_9dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdZD9","TRUEdZD9"),0.05)
 
+dPD_0dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdPD0","TRUEdPD0"),0.05)
+dPD_1dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdPD1","TRUEdPD1"),0.05)
+dPD_5dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdPD5","TRUEdPD5"),0.05)
+dPD_9dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEdPD9","TRUEdPD9"),0.05)
 
-###------------------------------------------------------------------------
+HC_0dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEHC0","TRUEHC0"),0.05)
+HC_1dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEHC1","TRUEHC1"),0.05)
+HC_5dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEHC5","TRUEHC5"),0.05)
+HC_9dpi_frame = extract_deseq_results(comp_deseq,ps_rare_diff_all,c("deseq_group","FALSEHC9","TRUEHC9"),0.05)
 
+all_comps_running = merge(dZD_0dpi_frame,dZD_1dpi_frame,c("Kingdom","Phylum","Class","Order","Family","Genus","Row.names"),all=T,suffixes=c('dzd0','dzd1'))
+all_taxa = union(dZD_0dpi_frame$Row.names,dZD_1dpi_frame$Row.names)
+all_taxa = union(all_taxa,dZD_5dpi_frame$Row.names)
+all_taxa = union(all_taxa,dZD_9dpi_frame$Row.names)
+all_taxa = union(all_taxa,dPD_0dpi_frame$Row.names)
+all_taxa = union(all_taxa,dPD_1dpi_frame$Row.names)
+all_taxa = union(all_taxa,dPD_5dpi_frame$Row.names)
+all_taxa = union(all_taxa,dPD_9dpi_frame$Row.names)
+all_taxa = union(all_taxa,HC_0dpi_frame$Row.names)
+all_taxa = union(all_taxa,HC_1dpi_frame$Row.names)
+all_taxa = union(all_taxa,HC_5dpi_frame$Row.names)
+all_taxa = union(all_taxa,HC_9dpi_frame$Row.names)
 
+alldf = as.data.frame(all_taxa)
+alldf$Row.names = alldf$all_taxa
+master_results = alldf
+ress = merge(dZD_0dpi_frame,alldf,"Row.names",all=T)
+master_results$dzd0_fc = ress$log2FoldChange
+ress = merge(dZD_1dpi_frame,alldf,"Row.names",all=T)
+master_results$dzd1_fc = ress$log2FoldChange
+ress = merge(dZD_5dpi_frame,alldf,"Row.names",all=T)
+master_results$dzd5_fc = ress$log2FoldChange
+ress = merge(dZD_9dpi_frame,alldf,"Row.names",all=T)
+master_results$dzd9_fc = ress$log2FoldChange
 
+ress = merge(dPD_0dpi_frame,alldf,"Row.names",all=T)
+master_results$dpd0_fc = ress$log2FoldChange
+ress = merge(dPD_1dpi_frame,alldf,"Row.names",all=T)
+master_results$dpd1_fc = ress$log2FoldChange
+ress = merge(dPD_5dpi_frame,alldf,"Row.names",all=T)
+master_results$dpd5_fc = ress$log2FoldChange
+ress = merge(dPD_9dpi_frame,alldf,"Row.names",all=T)
+master_results$dpd9_fc = ress$log2FoldChange
+
+ress = merge(HC_0dpi_frame,alldf,"Row.names",all=T)
+master_results$hc0_fc = ress$log2FoldChange
+ress = merge(HC_1dpi_frame,alldf,"Row.names",all=T)
+master_results$hc1_fc = ress$log2FoldChange
+ress = merge(HC_5dpi_frame,alldf,"Row.names",all=T)
+master_results$hc5_fc = ress$log2FoldChange
+ress = merge(HC_9dpi_frame,alldf,"Row.names",all=T)
+master_results$hc9_fc = ress$log2FoldChange
+# replace NA with 0
+master_results[is.na(master_results)] = 0
+
+row.names(master_results) = paste0(tax_table(ps_rare_diff_all)[master_results$Row.names,'Family'],
+                                   ' ',tax_table(ps_rare_diff_all)[master_results$Row.names,'Genus'],
+                                   ' ',nrow(master_results)+1-seq_along(taxa_names(ps_rare_diff_all)[1:nrow(master_results)]))
+master_results$all_taxa = NULL
+master_results$Row.names = NULL
+paletteLength = 100
+myBreaks <- c(seq(min(master_results), 0, length.out=ceiling(paletteLength/2) + 1), 
+              seq(max(master_results)/paletteLength, max(master_results), length.out=floor(paletteLength/2)))
+pheatmap(master_results,cluster_cols=FALSE,
+         color = colorRampPalette(c("blue", "white", "red"))(paletteLength),
+         breaks = myBreaks,
+         file="~/Documents/projects/campy_murine_diets/results/diffabund_heatmap.png",
+         width = 8,
+         height = 6)
 
